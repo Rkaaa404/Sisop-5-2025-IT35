@@ -1,12 +1,12 @@
-# Sisop-5-2025-IT-Template
+# Sisop-5-2025-IT35
 
 ## Kelompok
 
 Nama | NRP
 --- | ---
-Amoes Noland | 5027231028
-Rafi' Afnaan Fathurrahman | 5027231040
-
+Rayka Dharma Pranandita | 5027241039
+Bima Aria Perthama | 5027241060
+Gemilang Ananda Lingua | 5027241072
 ## Daftar Isi
 
 - [Kelompok](#kelompok)
