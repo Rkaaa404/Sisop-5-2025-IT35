@@ -6,11 +6,11 @@ global _getBiosTick
 
 ; unsigned int getBiosTick()
 _getBiosTick:
-        mov ah, 0x00
-        int 0x1A
-        mov ax, dx
-        mov dx, cx
-        ret
+    mov ah, 0x00
+    int 0x1A
+    mov ax, dx
+    mov dx, cx
+    ret
 
 ; void putInMemory(int segment, int address, char character)
 _putInMemory:

@@ -5,7 +5,6 @@
 
 void shell();
 void parseCommand(char *buf, char *cmd, char arg[2][64]);
-
-// Tambahkan fungsi bila perlu
+void pickCompany(char arg[2][64], byte *color, char *user);
 
 #endif // __SHELL_H__
