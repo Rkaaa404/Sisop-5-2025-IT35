@@ -11,7 +11,6 @@ int main() {
   return 0;
 }
 
-// Reverted to use AH=0x0E for character printing for stability
 void printString(char *str, byte color_attribute) {
   int i = 0;
   while (str[i] != '\0') {
@@ -19,15 +18,12 @@ void printString(char *str, byte color_attribute) {
       interrupt(0x10, (0x0E << 8) | '\r', VIDEO_PAGE << 8, 0, 0);
       interrupt(0x10, (0x0E << 8) | '\n', VIDEO_PAGE << 8, 0, 0);
     } else {
-      // Use INT 0x10, AH=0x0E for teletype output
-      // The color_attribute will not be used by this BIOS call
       interrupt(0x10, (0x0E << 8) | str[i], VIDEO_PAGE << 8, 0, 0);
     }
     i++;
   }
 }
 
-// Kept AH=0x0E for echo and backspace space to ensure stability
 void readString(char *buf, byte color_attribute) {
   int i = 0;
   int ch_code_ax;
@@ -37,19 +33,19 @@ void readString(char *buf, byte color_attribute) {
     ch_code_ax = interrupt(0x16, 0x00 << 8, 0, 0, 0);
     ch = (char)ch_code_ax;
 
-    if (ch == 0x0D) { // Enter key
+    if (ch == 0x0D) {
       buf[i] = '\0';
       interrupt(0x10, (0x0E << 8) | '\r', VIDEO_PAGE << 8, 0, 0);
       interrupt(0x10, (0x0E << 8) | '\n', VIDEO_PAGE << 8, 0, 0);
       break;
-    } else if (ch == 0x08) { // Backspace
+    } else if (ch == 0x08) {
       if (i > 0) {
         i--;
         interrupt(0x10, (0x0E << 8) | '\b', VIDEO_PAGE << 8, 0, 0);
         interrupt(0x10, (0x0E << 8) | ' ',  VIDEO_PAGE << 8, 0, 0);
         interrupt(0x10, (0x0E << 8) | '\b', VIDEO_PAGE << 8, 0, 0);
       }
-    } else if (ch >= ' ' && ch <= '~') { // Printable character
+    } else if (ch >= ' ' && ch <= '~') {
       if (i < 127) {
         buf[i] = ch;
         interrupt(0x10, (0x0E << 8) | ch, VIDEO_PAGE << 8, 0, 0);
