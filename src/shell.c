@@ -13,11 +13,13 @@ void shell() {
   char buf[128];
   char cmd[16];
   char arg[2][64]; 
-  char user[64];   
+  char user[64];
+  int neutral;   
   byte color;      
 
   strcpy(user, "user"); 
-  color = WHITE;        
+  color = WHITE;
+  neutral = 1;        
 
   printString("Welcome to EorzeOS!\n", color);
   while (true) {
@@ -43,7 +45,7 @@ void shell() {
         k++;
       }
 
-      if (atSymbolPosition != 0) {
+      if (!neutral) {
         baseNameLength = atSymbolPosition - user;
         if (baseNameLength < 64) {
             strncpy(tempUserBase, user, baseNameLength);
@@ -62,13 +64,26 @@ void shell() {
         strcpy(user, "user");
         printString("Username changed to user\n", color);
       } else {
-        strcpy(user, arg[0]);
+        if (neutral){
+          strcpy(user, arg[0]);
+        } else {
+          char companyName[64];
+          char *iterator = user;
+          while (*iterator != '\0' && *iterator != '@'){
+            iterator++;
+          }
+
+          strcpy(companyName, iterator);
+          strcpy(user, arg[0]);
+          strcat(user, companyName);
+        }
         printString("Username changed to ", color);
         printString(user, color);
         printString("\n", color);
       }
     } else if (strcmp(cmd, "grandcompany") == 0) {
       pickCompany(arg, &color, user); 
+      neutral = 0;
     } else if (strcmp(cmd, "add") == 0) {
       int a, b, result;
       char str_result[32];

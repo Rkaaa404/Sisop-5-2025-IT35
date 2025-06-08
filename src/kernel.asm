@@ -3,7 +3,19 @@
 global _putInMemory
 global _interrupt
 global _getBiosTick
+global _getCursorPos
 
+; returns (row << 8) | col
+_getCursorPos:
+    push bp
+    mov bp, sp
+    mov ah, 0x03    ; BIOS function to get cursor position
+    mov bh, 0x00    ; Page number 0
+    int 0x10        ; Call video interrupt
+    mov ax, dx      ; Move the result from DX (DH=row, DL=col) to AX for return
+    pop bp
+    ret
+	
 ; unsigned int getBiosTick()
 _getBiosTick:
     mov ah, 0x00
