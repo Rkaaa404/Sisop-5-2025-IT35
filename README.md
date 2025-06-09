@@ -176,13 +176,294 @@ Pada suatu hari, anda merasa sangat lelah dari segala macam praktikum yang sudah
 
 
 ## Laporan
+### Handling I/O
+Dalam menghandle pergerakan kursor, kami menambahkan kode assembly yang berfungsi untuk mendapatkan posisi kursor saat ini, hal ini terdapat pada *kernel.asm*:
+```asm
+global _getCursorPos
 
-### The Echo    
-### Yo, Gurt
-### Username
-### Grandcompany
-### Arithmatics
-### Makefile
+; returns (row << 8) | col
+_getCursorPos:
+    push bp
+    mov bp, sp
+    mov ah, 0x03    ; BIOS function to get cursor position
+    mov bh, 0x00    ; Page number 0
+    int 0x10        ; Call video interrupt
+    mov ax, dx      ; Move the result from DX (DH=row, DL=col) to AX for return
+    pop bp
+    ret
+```
+Selanjutnya pada kode c untuk input dan output serta clear screen:
+```c
+void printString(char *str, byte color_attribute) {
+  int i = 0;
+  int cursor_pos;
+  int row, col;
+
+  while (str[i] != '\0') {
+    if (str[i] == '\n') {
+      interrupt(0x10, (0x0E << 8) | '\r', 0, 0, 0);
+      interrupt(0x10, (0x0E << 8) | '\n', 0, 0, 0);
+    } else {
+      cursor_pos = getCursorPos();
+      row = (cursor_pos >> 8) & 0xFF;
+      col = cursor_pos & 0xFF;
+
+      interrupt(0x10, (0x0E << 8) | str[i], 0, 0, 0);
+
+      putInMemory(0xB800, (row * 80 + col) * 2 + 1, color_attribute);
+    }
+    i++;
+  }
+}
+void readString(char *buf, byte color_attribute) {
+  int i = 0;
+  int ch_code_ax;
+  char ch;
+
+  while (1) {
+    ch_code_ax = interrupt(0x16, 0x00 << 8, 0, 0, 0);
+    ch = (char)ch_code_ax;
+
+    if (ch == 0x0D) { // Enter Key
+      buf[i] = '\0';
+      interrupt(0x10, (0x0E << 8) | '\r', VIDEO_PAGE << 8, 0, 0);
+      interrupt(0x10, (0x0E << 8) | '\n', VIDEO_PAGE << 8, 0, 0);
+      break;
+    } else if (ch == 0x08) { // Backspace
+      if (i > 0) {
+        i--;
+        interrupt(0x10, (0x0E << 8) | '\b', VIDEO_PAGE << 8, 0, 0);
+        interrupt(0x10, (0x0E << 8) | ' ',  VIDEO_PAGE << 8, 0, 0);
+        interrupt(0x10, (0x0E << 8) | '\b', VIDEO_PAGE << 8, 0, 0);
+      }
+    } else if (ch >= ' ' && ch <= '~') { // Printable Character
+      if (i < 127) {
+        int cursor_pos;
+        int row, col;
+        
+        buf[i] = ch;
+
+        cursor_pos = getCursorPos();
+        row = (cursor_pos >> 8) & 0xFF;
+        col = cursor_pos & 0xFF;
+
+        interrupt(0x10, (0x0E << 8) | ch, VIDEO_PAGE << 8, 0, 0);
+
+        putInMemory(0xB800, (row * 80 + col) * 2 + 1, color_attribute);
+
+        i++;
+      }
+    }
+  }
+}
+
+void clearScreen() {
+  interrupt(0x10, (0x06 << 8) | 0x00, (WHITE << 8) | 0x00, (0x00 << 8) | 0x00, (24 << 8) | 79);
+  interrupt(0x10, (0x02 << 8) | 0x00, VIDEO_PAGE << 8, 0x00 << 8 | 0x00, 0);
+}
+```
+Dimana untuk print pada screen kita menggunakan interrupt, yang diikuti dengan putInMemory untuk menambahkan warna
+### The Echo (1)
+Apapun yang diketik pengguna akan melakukan echo, atau melakukan print kembali, bila itu tidak termasuk *command* yang valid. Hal ini dapat dilakukan dengan meletakkan kode pada *else if* terakhir dari percabangan pilihan, yang dituliskan sebagai berikut:
+```c
+else if (buf[0] != '\0') {
+   printString(buf, color);
+   printString("\n", color);
+}
+```
+Dimana akan dilakukan pengecekan terlebih dahulu, jika buffer tidak kosong maka akan melakukan printString buffer dan printString newline
+### Yo, Gurt (2)
+```c
+    else if (strcmp(cmd, "yo") == 0) {
+      printString("gurt", color);
+      printString("\n", color);
+    } else if (strcmp(cmd, "gurt") == 0) {
+      printString("yo", color);
+      printString("\n", color);
+```
+Ketika command dari user berupa yo akan print gurt, ketika command berupa gurt akan print yo
+### Username (3)
+```c
+    else if (strcmp(cmd, "user") == 0) {
+      if (arg[0][0] == '\0') { 
+        strcpy(user, "user");
+        printString("Username changed to user\n", color);
+      } else {
+        if (neutral){
+          strcpy(user, arg[0]);
+        } else {
+          char companyName[64];
+          char *iterator = user;
+          while (*iterator != '\0' && *iterator != '@'){
+            iterator++;
+          }
+
+          strcpy(companyName, iterator);
+          strcpy(user, arg[0]);
+          strcat(user, companyName);
+        }
+        printString("Username changed to ", color);
+        printString(user, color);
+        printString("\n", color);
+      }
+    }
+```
+Melakukan pengecekan terlebih dahulu apakah command diikuti dengan arg berupa usernam yang diinginkan, jika tidak maka username akan diubah menjadi *user*, selanjutnya dilakukan pengecekan apakah user netral (tidak terafiliasi company), jika iya maka akan langsung mengcopy username baru kedalam variable user. Jika tidak maka akan melakukan operasi yang mengambil suffix company (@company), selanjutnya menimpa variable user dengan username baru, dan variable user akhirnya digabungkan dengan suffix company yang disimpan sebelumnya.    
+
+### Grandcompany (4)
+Memungkinkan user bergabung dengan company (menambahkan suffix company di belakang username dari user), perubahan warna terminal, serta melakukan clear screen. Selain itu ditambahkan command clear, yang menghilangkan company suffix pada username user dan mengembalikan warna terminal menjadi putih.
+```c
+// Define color codes
+#define WHITE 0x07
+#define RED 0x0C
+#define BLUE 0x09
+#define YELLOW 0x0E
+
+void pickCompany(char arg[2][64], byte *color, char *user) {
+  char baseUser[32]; 
+  char *atSymbol;
+  int k = 0; 
+  int len_base_user; 
+
+  atSymbol = 0; 
+  while(user[k] != '\0'){
+    if(user[k] == '@'){
+      atSymbol = &user[k];
+      break;
+    }
+    k++;
+  }
+
+  if (atSymbol != 0) {
+    len_base_user = atSymbol - user;
+    if (len_base_user > 31) len_base_user = 31; 
+    strncpy(baseUser, user, len_base_user);
+    baseUser[len_base_user] = '\0';
+  } else { 
+    strcpy(baseUser, user);
+  }
+
+
+  if (strcmp(arg[0], "maelstrom") == 0) {
+    *color = RED;
+    strcpy(user, baseUser);
+    strcat(user, "@Storm");   
+    clearScreen();
+  } else if (strcmp(arg[0], "twinadder") == 0) {
+    *color = YELLOW; 
+    strcpy(user, baseUser);
+    strcat(user, "@Serpent");
+    clearScreen();
+  } else if (strcmp(arg[0], "immortalflames") == 0) {
+    *color = BLUE; 
+    strcpy(user, baseUser);
+    strcat(user, "@Flame");
+    clearScreen();
+  } else {
+    printString("Company itu belum ada...\n", *color);
+  }
+}
+```
+Sebelumnya melakukan pengecekan apakah user sudah memiliki suffix suatu company dan jika ada menyimpan baseUserNamenya (username inti tanpa company suffix). Selanjutnya dilakukan pengecekan company yang diinput user, yang jika termasuk dalam daftar nama yang tersedia akan terjadi perubahan warna, dan penambahan suffix company yang dipilih pada baseUserName serta dilanjut dengan clearScreen. Jika tidak ada dalam opsi, maka akan melakukan printString dengan kalimat "Company itu belum ada...". Pemanggilan fungsi ini pada cabang pilihan di fungsi shell adalah sebagai berikut:
+```c
+else if (strcmp(cmd, "grandcompany") == 0) {
+      pickCompany(arg, &color, user); 
+      neutral = 0;
+}
+```
+Dimana nilai int neutral yang menandakan user netral (tidak terafiliasi dengan company) menjadi 0 atau false. Selanjutnya untuk kode bagian clear adalah sebagai berikut:
+```c
+    if (strcmp(cmd, "clear") == 0) {
+      char tempUserBase[64];
+      char *atSymbolPosition = 0;
+      int k = 0;
+      int baseNameLength;
+
+      clearScreen();
+      color = WHITE;
+
+      while(user[k] != '\0'){
+        if(user[k] == '@'){
+          atSymbolPosition = &user[k];
+          break;
+        }
+        k++;
+      }
+
+      if (!neutral) {
+        baseNameLength = atSymbolPosition - user;
+        if (baseNameLength < 64) {
+            strncpy(tempUserBase, user, baseNameLength);
+            tempUserBase[baseNameLength] = '\0';
+            strcpy(user, tempUserBase);
+        }
+      }
+      neutral = 1; 
+    }
+```
+Dimana pada fungsi ini akan merubah color menjadi WHITE dan jika tidak netral akan mengubah username menjadi baseUserNamenya saja, selanjutnya di akhir kode aka  mengubah nilai dari neutral menjadi 1 atau True.
+### Arithmetics (5)
+Melakukan operasi matematika dasar dua angka, yang mampu menghandle input dan output bernilai negatif
+```c
+    else if (strcmp(cmd, "add") == 0) {
+      int a, b, result;
+      char str_result[32];
+      atoi(arg[0], &a);
+      atoi(arg[1], &b);
+      result = a + b;
+      itoa(result, str_result);
+      printString(str_result, color);
+      printString("\n", color);
+    } else if (strcmp(cmd, "sub") == 0) {
+      int a, b, result;
+      char str_result[32];
+      atoi(arg[0], &a);
+      atoi(arg[1], &b);
+      result = a - b;
+      itoa(result, str_result);
+      printString(str_result, color);
+      printString("\n", color);
+    } else if (strcmp(cmd, "mul") == 0) {
+      int a, b, result;
+      char str_result[32];
+      atoi(arg[0], &a);
+      atoi(arg[1], &b);
+      result = a * b;
+      itoa(result, str_result);
+      printString(str_result, color);
+      printString("\n", color);
+    } else if (strcmp(cmd, "div") == 0) { 
+      int a, b, result_val; 
+      char str_result[32];
+      atoi(arg[0], &a);
+      atoi(arg[1], &b);
+      result_val = div(a, b); 
+      itoa(result_val, str_result);
+      printString(str_result, color);
+      printString("\n", color);
+    }
+```
+Secara general, untuk arithmetics, akan merubah argumen yang diinput menjadi int, melalui operasi atoi, dan melakukan kalkulasi yang disimpan dalam result, selanjutnya int tersebut diubah kembali menjadi string dengan itoa, dan dilakukan printString. Pada kasus division atau pembagian menggunakan fungsi yang telah disiapkan di *std_lib.c*.
+### Yogurt (6)     
+Mengeluarkan output random antara tiga kalimat ketika user menginput yogurt
+```c
+else if (strcmp(cmd, "yogurt") == 0) { 
+      unsigned int tick;
+      int choice;
+      tick = getBiosTick(); // Get BIOS tick count
+      choice = mod(tick, 3);  // Get a choice based on tick
+
+      if (choice == 0) {
+        printString("gurt> ts unami gng </3\n", color);
+      } else if (choice == 1) {
+        printString("gurt> yo\n", color);
+      } else {
+        printString("gurt> sygau\n", color);
+      }
+}
+```
+Ketika user mengetik yogurt, maka akan dilakukan randomize berdasarkan hasil modulus BIOS tick dengan 3, yang akan menghasilkan 3 hasil, yaitu 0, 1, 2. Hal ini sesuai dengan jumlah pilihan yang kita miliki yaitu gurt> ts unami gng </3, gurt> yo, dan gurt> sygau.
+### Makefile (7)
 ```makefile
 SRC_DIR = src
 BIN_DIR = bin
@@ -221,3 +502,4 @@ clean:
 
 build: prepare bootloader stdlib shell kernel link
 ```
+Melakukan compile seperti biasa untuk tiap bagian kode, dengan tambahan -I directory *include* agar header files ikut terbaca dalam proses compile. Lalu pada bagian akhir compiling kernel, menggunakan ld86 yang melakukan link *kernel.o, kernel-asm.o, shell.o dan std_lib.o* menjadi satu file berupa *kernel.bin*.
