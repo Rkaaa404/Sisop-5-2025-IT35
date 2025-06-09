@@ -52,7 +52,8 @@ void shell() {
             tempUserBase[baseNameLength] = '\0';
             strcpy(user, tempUserBase);
         }
-      }       
+      }
+      neutral = 1; 
     } else if (strcmp(cmd, "yo") == 0) {
       printString("gurt", color);
       printString("\n", color);
