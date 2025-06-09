@@ -263,6 +263,159 @@ void clearScreen() {
 }
 ```
 Dimana untuk print pada screen kita menggunakan interrupt, yang diikuti dengan putInMemory untuk menambahkan warna
+### *std_lib*   
+Penjelasan untuk tiap fungsi dalam *std_lib.c*:    
+- Division (pembagian)
+```c
+int div(int a, int b) {
+  int result;   
+  bool negative; 
+
+  if (b == 0) {
+    // Division by zero, return 0
+    return 0;
+  }
+
+  result = 0;
+  negative = (a < 0) ^ (b < 0); // XOR check a b negatif atau tidak
+
+  if (a < 0) {
+    a = -a;
+  }
+  if (b < 0) {
+    b = -b;
+  }
+
+  while (a >= b) {
+    a -= b;
+    result++;
+  }
+
+  return negative ? -result : result;
+}
+```
+Melakukan pembagian secara terus menerus hingga a < b. Serta ada check XOR untuk nilai negatif a dan b, jika a atau b saja yang negatif maka variable *negative* bernilai 1, sedangkan untuk kemungkinan lain, maka akan bernilai 0. Pada bagian return, jika *negative* True atau bernilai 1, maka result akan bernilai negatif, namun (!*negative*) maka akan return result biasa.    
+
+Selanjutnya yaitu mod, atau modulo, modulus:
+```c
+int mod(int a, int b) {
+  if (b == 0) {
+    return 0;
+  }
+  return a - div(a, b) * b;
+}
+```
+Melakukan operasi modulo biasa.     
+
+Selanjutnya yaitu strcmp atu string compare:
+```c
+bool strcmp(char *str1, char *str2) {
+  while (*str1 && (*str1 == *str2)) {
+    str1++;
+    str2++;
+  }
+  return (*str1 - *str2); 
+}
+```
+Melakukan pengurangan nilai ASCII dari huruf huruf yang ada di string yang dicek, apabila bernilai 0 maka kedua string identik.    
+
+Selanjutnya ada strcpy atau string copy:
+```c
+void strcpy(char *dst, char *src) {
+  while (*src) {
+    *dst++ = *src++;
+  }
+  *dst = '\0';
+}
+```
+Melakukan while loop hingga pointer src mencapai null terminator, dimana pada tiap iterasi, tiap char dari string src dimasukkan (copy) ke dst atau string destination (tujuan). Saat selesai, maka akan dilakukan penambahan null terminator     
+
+Selanjutnya ada clear:
+```c
+void clear(byte *buf, unsigned int size) {
+  unsigned int i; 
+  for (i = 0; i < size; i++) {
+    buf[i] = 0;
+  }
+}
+```
+Mengisi variable yang dipilih dengan nilai 0 atau mengkosongkannya, agar bisa digunakan untuk menerima input lagi     
+
+Selanjutnya ada atoi:
+```c
+void atoi(char *str, int *num) {
+  int result = 0; 
+  int sign = 1;   
+
+  if (*str == '-') {
+    sign = -1;
+    str++;
+  }
+
+  while (*str >= '0' && *str <= '9') {
+    result = result * 10 + (*str - '0');
+    str++;
+  }
+  *num = sign * result;
+}
+```
+Mengubah ASCII menjadi integer      
+
+Selanjutnya ada itoa:
+```c
+void itoa(int num, char *str) {
+  int i = 0;   
+  int sign = num; 
+  int j;       
+  char temp;    
+  int len;      
+
+  if (sign == 0) {
+    str[i++] = '0';
+    str[i] = '\0';
+    return;
+  }
+
+  if (sign < 0) {
+    num = -num; 
+  }
+
+  while (num > 0) {
+    str[i++] = mod(num, 10) + '0'; 
+    num = div(num, 10);            
+  }
+
+  if (sign < 0) {
+    str[i++] = '-';
+  }
+  str[i] = '\0'; // Null-terminate string
+
+  len = i; 
+  j = 0;   
+  while (j < div(len, 2)) {
+    temp = str[j];
+    str[j] = str[len - j - 1];
+    str[len - j - 1] = temp;
+    j++;
+  }
+}
+```
+Mengubah int menjadi ASCII atau string     
+
+Selanjutnya ada strcat:
+```c
+void strcat(char *dest, char *src) {
+  while (*dest) { 
+    dest++;
+  }
+
+  while (*src) { 
+    *dest++ = *src++;
+  }
+  *dest = '\0'; // Null-terminate the string
+}
+```
+Mirip dengan strcmp, namun pointer dest dimajukan terlebih dahulu hingga akhir lalu ditambahkan dengan string src.
 ### The Echo (1)
 Apapun yang diketik pengguna akan melakukan echo, atau melakukan print kembali, bila itu tidak termasuk *command* yang valid. Hal ini dapat dilakukan dengan meletakkan kode pada *else if* terakhir dari percabangan pilihan, yang dituliskan sebagai berikut:
 ```c
